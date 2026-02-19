@@ -63,6 +63,7 @@
         
         .form-group {
             margin-bottom: 16px;
+            position: relative;
         }
         
         label {
@@ -95,6 +96,22 @@
             color: #8c8c8c;
         }
         
+        input.error {
+            border-color: #e50914;
+            background: rgba(229, 9, 20, 0.1);
+        }
+        
+        .error-message {
+            color: #e50914;
+            font-size: 13px;
+            margin-top: 6px;
+            display: none;
+        }
+        
+        .error-message.show {
+            display: block;
+        }
+        
         button {
             width: 100%;
             padding: 16px;
@@ -111,6 +128,11 @@
         
         button:hover {
             background: #f40612;
+        }
+        
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
         }
         
         .login-link {
@@ -158,12 +180,24 @@
             <div class="form-group">
                 <label for="username">Username</label>
                 <input type="text" id="username" name="username" required placeholder="Enter your username">
+                <div class="error-message" id="username-error"></div>
+            </div>
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" required placeholder="Enter your email">
+                <div class="error-message" id="email-error"></div>
             </div>
             <div class="form-group">
                 <label for="password">Password</label>
                 <input type="password" id="password" name="password" required placeholder="Enter your password">
+                <div class="error-message" id="password-error"></div>
             </div>
-            <button type="submit">Register</button>
+            <div class="form-group">
+                <label for="confirmPassword">Confirm Password</label>
+                <input type="password" id="confirmPassword" name="confirmPassword" required placeholder="Confirm your password">
+                <div class="error-message" id="confirmPassword-error"></div>
+            </div>
+            <button type="submit" id="registerButton">Register</button>
         </form>
         <div class="login-link">
             Already have an account? <a href="login.html">Sign In</a>
@@ -174,10 +208,63 @@
         document.getElementById('registerForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            const username = document.getElementById('username').value;
+            // Reset previous errors
+            resetErrors();
+            
+            // Get form values
+            const username = document.getElementById('username').value.trim();
+            const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            
+            // Validate form
+            let isValid = true;
+            
+            // Username validation
+            if (!username) {
+                showError('username-error', 'Username is required');
+                isValid = false;
+            }
+            
+            // Email validation
+            if (!email) {
+                showError('email-error', 'Email is required');
+                isValid = false;
+            } else if (!isValidEmail(email)) {
+                showError('email-error', 'Please enter a valid email address');
+                isValid = false;
+            }
+            
+            // Password validation
+            if (!password) {
+                showError('password-error', 'Password is required');
+                isValid = false;
+            } else if (password.length < 6) {
+                showError('password-error', 'Password must be at least 6 characters');
+                isValid = false;
+            }
+            
+            // Confirm password validation
+            if (!confirmPassword) {
+                showError('confirmPassword-error', 'Please confirm your password');
+                isValid = false;
+            } else if (password !== confirmPassword) {
+                showError('confirmPassword-error', 'Passwords do not match');
+                isValid = false;
+            }
+            
+            // If validation fails, don't submit
+            if (!isValid) {
+                return;
+            }
+            
+            // Disable button during submission
+            const submitButton = document.getElementById('registerButton');
+            submitButton.disabled = true;
+            submitButton.textContent = 'Registering...';
             
             try {
+                // Send only username and password to backend (as requested)
                 const response = await fetch("http://localhost:3000/register", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -195,8 +282,95 @@
             } catch (error) {
                 console.error(error);
                 alert("Network error. Please try again.");
+            } finally {
+                // Re-enable button
+                submitButton.disabled = false;
+                submitButton.textContent = 'Register';
             }
         });
+        
+        // Real-time validation
+        document.getElementById('username').addEventListener('blur', function() {
+            const username = this.value.trim();
+            if (!username) {
+                showError('username-error', 'Username is required');
+            } else {
+                hideError('username-error');
+            }
+        });
+        
+        document.getElementById('email').addEventListener('blur', function() {
+            const email = this.value.trim();
+            if (!email) {
+                showError('email-error', 'Email is required');
+            } else if (!isValidEmail(email)) {
+                showError('email-error', 'Please enter a valid email address');
+            } else {
+                hideError('email-error');
+            }
+        });
+        
+        document.getElementById('password').addEventListener('blur', function() {
+            const password = this.value;
+            if (!password) {
+                showError('password-error', 'Password is required');
+            } else if (password.length < 6) {
+                showError('password-error', 'Password must be at least 6 characters');
+            } else {
+                hideError('password-error');
+            }
+        });
+        
+        document.getElementById('confirmPassword').addEventListener('blur', function() {
+            const password = document.getElementById('password').value;
+            const confirmPassword = this.value;
+            if (!confirmPassword) {
+                showError('confirmPassword-error', 'Please confirm your password');
+            } else if (password !== confirmPassword) {
+                showError('confirmPassword-error', 'Passwords do not match');
+            } else {
+                hideError('confirmPassword-error');
+            }
+        });
+        
+        // Helper functions
+        function showError(elementId, message) {
+            const errorElement = document.getElementById(elementId);
+            errorElement.textContent = message;
+            errorElement.classList.add('show');
+            
+            // Add error styling to input
+            const inputId = elementId.replace('-error', '');
+            document.getElementById(inputId).classList.add('error');
+        }
+        
+        function hideError(elementId) {
+            const errorElement = document.getElementById(elementId);
+            errorElement.classList.remove('show');
+            errorElement.textContent = '';
+            
+            // Remove error styling from input
+            const inputId = elementId.replace('-error', '');
+            document.getElementById(inputId).classList.remove('error');
+        }
+        
+        function resetErrors() {
+            const errorElements = document.querySelectorAll('.error-message');
+            errorElements.forEach(element => {
+                element.classList.remove('show');
+                element.textContent = '';
+            });
+            
+            const inputElements = document.querySelectorAll('input');
+            inputElements.forEach(input => {
+                input.classList.remove('error');
+            });
+        }
+        
+        function isValidEmail(email) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return emailRegex.test(email);
+        }
     </script>
 </body>
 </html>
